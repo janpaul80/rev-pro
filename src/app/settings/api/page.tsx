@@ -33,31 +33,15 @@ export default function ApiSettings() {
 
   const createKey = async () => {
     setGenerating(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setGenerating(false);
-      return;
-    }
-
-    // Generate a secure-looking token
-    const randomChars = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const newKeyStr = `rev_live_${randomChars}`;
-
-    const { data, error } = await supabase
-      .from('api_keys')
-      .insert({
-        user_id: user.id,
-        provider: 'rev',
-        encrypted_key: newKeyStr // In a real app, hash this and only show once!
-      })
-      .select()
-      .single();
-
-    if (data) {
-      setKeys([data, ...keys]);
-    } else {
-      console.error(error);
+    try {
+      const response = await fetch('/api/keys', { method: 'POST' });
+      const data = await response.json();
+      if (data.key) {
+        // We inject the unhashed key temporarily into the first payload so they can copy it once
+        setKeys([{ ...data.record, temp_full_key: data.key }, ...keys]);
+      }
+    } catch (e) {
+      console.error(e);
     }
     setGenerating(false);
   };
@@ -98,19 +82,21 @@ export default function ApiSettings() {
             <tbody>
               {keys.map((k) => (
                 <tr key={k.id}>
-                  <td style={{ padding: '1rem', color: '#fff' }}>Default Key</td>
+                  <td style={{ padding: '1rem', color: '#fff' }}>{k.key_name || 'Default Key'}</td>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'monospace', color: '#ccc' }}>
-                      {showKeyId === k.id ? k.encrypted_key : `rev_live_${'*'.repeat(24)}`}
-                      <button onClick={() => setShowKeyId(showKeyId === k.id ? null : k.id)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
-                        {showKeyId === k.id ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
+                      {showKeyId === k.id ? (k.temp_full_key || "rev_live_••••••••••••••••••••••••") : k.key_prefix + '••••••••••'}
+                      {k.temp_full_key && (
+                        <button onClick={() => setShowKeyId(showKeyId === k.id ? null : k.id)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
+                          {showKeyId === k.id ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td style={{ padding: '1rem', color: '#666', fontSize: '0.9rem' }}>{new Date(k.created_at).toLocaleDateString()}</td>
                   <td style={{ padding: '1rem', color: '#666', fontSize: '0.9rem' }}>{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <button onClick={() => copyToClipboard(k.encrypted_key)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', color: '#888', cursor: 'pointer' }}>
+                    <button onClick={() => copyToClipboard(k.temp_full_key || `Cannot copy hidden key`)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', color: '#888', cursor: 'pointer' }}>
                       <Copy size={14} />
                     </button>
                   </td>

@@ -1,0 +1,26 @@
+name: Deploy Rev.pro to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 217.154.11.234
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/rev-pro
+            git pull origin main
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
+            echo "✅ Rev.pro deployed successfully at $(date)"

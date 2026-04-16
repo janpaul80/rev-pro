@@ -34,40 +34,12 @@ const Hero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '4rem' }}
+          style={{ maxWidth: '800px', margin: '0 auto', marginBottom: '4rem' }}
         >
-          <a href="/pricing" style={{ 
-            padding: '14px 32px', 
-            fontSize: '1rem', 
-            textDecoration: 'none',
-            background: '#fff',
-            color: '#000',
-            borderRadius: '12px',
-            fontWeight: '700',
-            transition: 'transform 0.2s',
-            boxShadow: '0 0 20px rgba(251, 176, 46, 0.15)'
-          }} onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
-            Get Premium Access
-          </a>
-          <a href="/signup" style={{ 
-            padding: '14px 32px', 
-            fontSize: '1rem', 
-            textDecoration: 'none',
-            background: 'transparent',
-            color: '#fff',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            fontWeight: '600',
-            transition: 'all 0.2s'
-          }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-            Sign Up
-          </a>
+          <TranscriptionApp />
         </motion.div>
-        
-        <TranscriptionApp />
-        
         <div style={{ marginTop: '1.5rem', color: '#555', fontSize: '0.9rem', fontWeight: '500' }}>
-          3 FREE USES TOTAL • NO CREDIT CARD REQUIRED
+          1 FREE VIDEO PARSE • NO CREDIT CARD REQUIRED
         </div>
       </div>
     </section>

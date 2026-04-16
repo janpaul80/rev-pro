@@ -11,13 +11,15 @@ import { useState } from 'react';
 const plans = [
   {
     name: 'Free',
-    tagline: 'Test the basics',
+    tagline: 'Try the basics',
     price: '0',
     duration: 'forever',
     features: [
-      '3 transcripts per day',
+      '3 transcriptions per day',
       '3 translations per day',
-      'TikTok, Reels, Shorts Support'
+      '5 AI credits (test Rewrite, Hooks)',
+      'No bulk import',
+      'No HD downloads'
     ],
     cta: 'Start Free',
     popular: false,
@@ -25,35 +27,37 @@ const plans = [
   },
   {
     name: 'Basic',
-    tagline: 'Viral Script Writer',
+    tagline: 'Creator Tools',
     price: '5',
     duration: 'per month',
     description: 'Turn any viral video into YOUR script. See exactly WHY videos blow up with our Virality Explainer.',
     features: [
-      'BULK PROCESSING',
-      '30 transcripts (no daily cap)',
-      '30 translations (any language)',
-      'Bulk import 20 videos at once',
-      'All Platforms',
-      'HD video downloads (no watermark)'
+      '30 transcriptions',
+      '30 translations',
+      '50 AI credits',
+      'Bulk import up to 20 videos',
+      'HD downloads',
+      'Access to AI tools (Rewrite, Hooks, Summaries)'
     ],
     cta: 'Get Started',
     popular: true,
     platformIcons: true
   },
   {
-    name: 'Monthly',
-    tagline: 'Full power, flexible billing',
+    name: 'Pro',
+    tagline: 'Unlimited Power',
     price: '15',
     duration: 'per month',
     subtext: '= $180/year',
-    description: 'EVERYTHING IN ANNUAL: Unlimited transcripts and translations for the power user.',
+    description: 'EVERYTHING IN BASIC: Unlimited resources for the power user.',
     features: [
-      'Unlimited transcripts',
+      'Unlimited transcriptions',
       'Unlimited translations',
-      'Bulk import 60 videos',
-      'Priority 24/7 support',
-      'Custom branding exports'
+      'Unlimited AI credits',
+      'Bulk import up to 60 videos',
+      'Priority support',
+      'Custom branding',
+      'Premium export options'
     ],
     cta: 'Go Pro',
     popular: false,

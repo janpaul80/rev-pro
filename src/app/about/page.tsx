@@ -20,7 +20,7 @@ export default function AboutUs() {
 
           <h2 style={{ fontSize: '2rem', color: '#fff', marginTop: '2rem' }}>Meet JP Hartmann</h2>
           <p>
-            My name is JP Hartmann — and I am a builder at heart.
+            My name is JP Hartmann, and I am a builder at heart.
           </p>
           
           <p>
@@ -56,11 +56,8 @@ export default function AboutUs() {
             <img 
               src="/assets/signature.png" 
               alt="Paul Hartmann Signature" 
-              style={{ width: '450px', height: 'auto', filter: 'brightness(0) invert(1)' }} 
+              style={{ width: '300px', height: 'auto', filter: 'brightness(0) invert(1)' }} 
             />
-            <p style={{ marginTop: '2rem' }}>
-              <a href="https://PaulHartmann.dev" style={{ color: '#fff', textDecoration: 'underline' }}>PaulHartmann.dev</a>
-            </p>
           </div>
         </div>
       </div>

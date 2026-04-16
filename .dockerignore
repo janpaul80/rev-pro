@@ -1,0 +1,9 @@
+.env*
+node_modules
+.next
+*.tsbuildinfo
+next-env.d.ts
+.git
+scratch
+test-langdock.ts
+tsconfig.tsbuildinfo

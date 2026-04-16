@@ -59,6 +59,51 @@ async function fetchWithRetry(
   throw lastError || new Error('All retry attempts exhausted');
 }
 
+async function checkCredits(userId: string) {
+  // 1. Get user plan
+  const { data: planData } = await supabase
+    .from('plan_tracking')
+    .select('plan_tier')
+    .eq('user_id', userId)
+    .single();
+
+  const tier = planData?.plan_tier || 'free';
+  
+  // 2. Count usage
+  if (tier === 'free') {
+    const today = new Date().toISOString().split('T')[0];
+    const { count } = await supabase
+      .from('usage_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('action_type', 'transcription')
+      .eq('status', 'success')
+      .gte('created_at', today);
+
+    if ((count || 0) >= 3) {
+      throw new Error('Daily limit reached (3 per day for Free tier). Please upgrade to Pro for unlimited access!');
+    }
+  } else if (tier === 'basic') {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0,0,0,0);
+    
+    const { count } = await supabase
+      .from('usage_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('action_type', 'transcription')
+      .eq('status', 'success')
+      .gte('created_at', startOfMonth.toISOString());
+
+    if ((count || 0) >= 30) {
+      throw new Error('Monthly limit reached (30 per month for Basic tier). Please upgrade to Pro for unlimited access!');
+    }
+  }
+  // Pro tier is unlimited
+  return tier;
+}
+
 // Mock transcription for emergency fallback
 function getMockResponse(url: string, platform: string) {
   return {
@@ -70,21 +115,43 @@ function getMockResponse(url: string, platform: string) {
 [01:15] Make sure to check the link in my bio for the exact tools I'm using today.
 [01:30] If this helped you, drop a comment with your biggest takeaway and I'll pin my favorite one!
 [01:45] See you in the next ${platform} video. Keep creating!`,
-    refined: `**Headline**: Master Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategy With High Retention Hacks\n\n**Key Takeaways**:\n1. Hook viewers in 3 seconds to avoid scrolling.\n2. Consistency is the top driver for organic growth.\n3. Captions boost retention by 30%.\n\n**Action Items**:\n- Use a proper transcription tool.\n- Add engaging captions directly to your video.\n- Check out the tools linked in the bio.`
+    refined: `**Headline**: Master Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategy With High Retention Hacks\n\n**Key Takeaways**:\n1. Hook viewers in 3 seconds to avoid scrolling.\n2. Consistency is the top driver for organic growth.\n3. Captions boost retention by 30%.\n\n**Action Items**:\n- Use a proper transcription tool.\n- Add engaging captions directly to your video.\n- Check out the tools linked in the bio.`,
+    heatmap: [
+      { second: 0, score: 95, label: "Initial Hook" },
+      { second: 10, score: 82, label: "Problem Intro" },
+      { second: 20, score: 75, label: "Context" },
+      { second: 30, score: 88, label: "Value Peak" },
+      { second: 40, score: 91, label: "Pro Tip" },
+      { second: 50, score: 84, label: "Example" },
+      { second: 60, score: 78, label: "Transition" }
+    ]
   };
 }
 
 export async function POST(req: Request) {
   const startTime = Date.now();
+  let userId: string | undefined;
+  let platform: string = 'unknown';
 
   try {
-    const { url, userId } = await req.json();
+    const body = await req.json();
+    userId = body.userId;
+    const url: string = body.url;
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    const platform = detectPlatform(url);
+    // 1. Strict Credit Gating
+    if (userId) {
+      try {
+        await checkCredits(userId);
+      } catch (gateError: any) {
+        return NextResponse.json({ error: gateError.message, code: 'LIMIT_EXCEEDED' }, { status: 402 });
+      }
+    }
+
+    platform = detectPlatform(url);
 
     // Log request metadata (no secrets)
     console.log(`[Transcribe] Request: platform=${platform}, url_length=${url.length}, userId=${userId || 'anonymous'}, mock=${USE_MOCK}`);
@@ -112,6 +179,7 @@ export async function POST(req: Request) {
 
     let transcript: string;
     let refined: string;
+    let heatmap: any[] = [];
 
     if (USE_MOCK || ['tiktok', 'instagram', 'youtube', 'unknown', 'x.com', 'facebook'].some(p => url.includes(p) || platform === p)) {
       // Demo fallback: return realistic mock data for ANY platform so demo never breaks
@@ -121,6 +189,7 @@ export async function POST(req: Request) {
       const mock = getMockResponse(url, displayPlatform);
       transcript = mock.transcript;
       refined = mock.refined;
+      heatmap = mock.heatmap;
     } else {
       // Real Langdock API call
       // using the Agents API format which requires UIMessage format
@@ -139,7 +208,13 @@ export async function POST(req: Request) {
               role: 'user',
               parts: [{
                 type: 'text',
-                text: `You are transcribing a video for the user. As an AI Agent, if you cannot actually scrape the video, politely state that you cannot access external links natively, but still respond successfully. URL: ${url}`
+                text: `You are transcribing and analyzing a video for virality. 
+                1. Provide the transcript.
+                2. Provide a 2-sentence summary/refined version.
+                3. PROVIDE A HEATMAP: Return an array of "Predictive Viral Potential" scores (0-100) for every 10-second segment of the video. 
+                Label each segment with what makes it engaging (e.g. "Pattern Interrupt", "Crucial Tip", "High Energy").
+                
+                URL: ${url}`
               }]
             }
           ]
@@ -159,14 +234,30 @@ export async function POST(req: Request) {
       // Log response metadata
       console.log(`[Langdock] Response: status=${response.status}, tokens=${data.usage?.total_tokens || 'unknown'}, content_length=${content.length}`);
 
-      // Parse the AI response into transcript and refined sections
-      const parts = content.split(/(?:refined|summary|key points)/i);
-      if (parts.length >= 2) {
-        transcript = parts[0].trim();
-        refined = parts.slice(1).join('\n').trim();
+      // Parse the AI response into transcript, refined, and heatmap sections
+      const sections = content.split(/(?:refined|summary|heatmap|retention)/i);
+      if (sections.length >= 3) {
+        transcript = sections[0].trim();
+        refined = sections[1].trim();
+        // Try to parse heatmap if it looks like JSON or just return mock for now if parsing fails
+        try {
+          const heatmapMatch = sections[2].match(/\[[\s\S]*\]/);
+          if (heatmapMatch) {
+            heatmap = JSON.parse(heatmapMatch[0]);
+          } else {
+             heatmap = getMockResponse(url, platform).heatmap;
+          }
+        } catch (e) {
+          heatmap = getMockResponse(url, platform).heatmap;
+        }
+      } else if (sections.length === 2) {
+        transcript = sections[0].trim();
+        refined = sections[1].trim();
+        heatmap = getMockResponse(url, platform).heatmap;
       } else {
         transcript = content;
-        refined = 'AI summary will appear here after processing.';
+        refined = 'AI summary will appear here.';
+        heatmap = getMockResponse(url, platform).heatmap;
       }
     }
 
@@ -180,9 +271,24 @@ export async function POST(req: Request) {
           status: 'completed',
           transcript,
           refined,
+          retention_data: heatmap, // Save the heatmap!
           processing_time_ms: processingTime,
         })
         .eq('id', transcriptionId);
+    }
+
+    // NEW: Log to usage_logs for deep analytics
+    if (userId) {
+      await supabase
+        .from('usage_logs')
+        .insert({
+          user_id: userId,
+          action_type: 'transcription',
+          platform: platform,
+          credits_used: 1,
+          processing_time_ms: processingTime,
+          status: 'success'
+        });
     }
 
     console.log(`[Transcribe] Success: processing_time=${processingTime}ms, transcript_length=${transcript.length}`);
@@ -191,6 +297,7 @@ export async function POST(req: Request) {
       success: true,
       transcript,
       refined,
+      heatmap,
       processingTime,
       platform,
     });
@@ -200,7 +307,7 @@ export async function POST(req: Request) {
     console.error(`[Transcribe] Error after ${processingTime}ms:`, error.message);
 
     // User-friendly error messages
-    let userMessage = 'Something went wrong. Please try again.';
+    let userMessage = error.message.includes('reached') ? error.message : 'Something went wrong. Please try again.';
     if (error.message.includes('timeout') || error.message.includes('AbortError')) {
       userMessage = 'The transcription timed out. Please try a shorter video or try again later.';
     } else if (error.message.includes('429') || error.message.includes('rate')) {
@@ -209,8 +316,23 @@ export async function POST(req: Request) {
       userMessage = 'Authentication error with transcription service. Please contact support.';
     }
 
+    // NEW: Log failure to usage_logs for error analytics
+    if (userId) {
+      await supabase
+        .from('usage_logs')
+        .insert({
+          user_id: userId,
+          action_type: 'transcription',
+          platform: platform || 'unknown',
+          credits_used: 0,
+          processing_time_ms: processingTime,
+          status: 'failed'
+        });
+    }
+
     return NextResponse.json({ 
       error: userMessage,
+      code: error.message.includes('Limit reached') ? 'LIMIT_EXCEEDED' : undefined,
       debug: process.env.NODE_ENV === 'development' ? error.message : undefined 
     }, { status: 500 });
   }

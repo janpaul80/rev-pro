@@ -5,7 +5,13 @@ const plans = [
     name: 'Free',
     price: '0',
     description: 'Perfect for exploring.',
-    features: ['3 total transcriptions', '99% accuracy', 'TikTok, YT, IG support'],
+    features: [
+      '3 transcriptions per day',
+      '3 translations per day',
+      '5 AI credits (test Rewrite, Hooks, etc.)',
+      'No bulk import',
+      'No HD downloads'
+    ],
     cta: 'Start Free',
     popular: false
   },
@@ -13,7 +19,14 @@ const plans = [
     name: 'Basic',
     price: '5',
     description: 'For casual content creators.',
-    features: ['Unlimited transcriptions', 'Priority queue', 'Email support', 'Ad-free experience'],
+    features: [
+      '30 transcriptions',
+      '30 translations',
+      '50 AI credits',
+      'Bulk import up to 20 videos',
+      'HD downloads',
+      'Access to AI tools (Rewrite, Hooks, etc.)'
+    ],
     cta: 'Choose Basic',
     popular: true
   },
@@ -21,7 +34,15 @@ const plans = [
     name: 'Pro',
     price: '15',
     description: 'For professional marketers.',
-    features: ['Everything in Basic', 'AI content repurposing', 'Bulk processing', 'Export as SRT/VTT', '24/7 Priority support'],
+    features: [
+      'Unlimited transcriptions',
+      'Unlimited translations',
+      'Unlimited AI credits',
+      'Bulk import up to 60 videos',
+      'Priority support',
+      'Custom branding',
+      'Premium export options'
+    ],
     cta: 'Choose Pro',
     popular: false
   }

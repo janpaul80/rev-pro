@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Account - Rev Pro</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #000000; padding: 60px 20px;">
+    <tr>
+      <td align="center">
+        <!-- Main Email Container -->
+        <table width="100%" max-width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #111111; border: 1px solid #222222; border-radius: 16px; margin: 0 auto; max-width: 600px; text-align: left;">
+          
+          <!-- Header Image/Logo -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #222222;">
+              <h1 style="color: #ffffff; font-size: 28px; font-weight: 800; margin: 0; letter-spacing: -0.5px;">Rev <span style="color: #fbb02e;">Pro</span></h1>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="color: #ffffff; font-size: 20px; font-weight: 600; margin-top: 0; margin-bottom: 16px;">Welcome to the next level of creation.</h2>
+              
+              <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
+                You're just one click away from transforming your content workflow. Please confirm your email address to activate your account and start generating high-retention transcriptions immediately.
+              </p>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin: 32px 0;">
+                <tr>
+                  <td style="background-color: #fbb02e; border-radius: 8px; text-align: center;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display: inline-block; padding: 14px 28px; color: #000000; font-size: 16px; font-weight: 700; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 14px rgba(251, 176, 46, 0.4);">
+                      Confirm Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #707070; font-size: 14px; line-height: 1.5; margin-top: 8px; margin-bottom: 0;">
+                Or, copy and paste this link completely into your browser:<br>
+                <a href="{{ .ConfirmationURL }}" style="color: #fbb02e; text-decoration: none; word-break: break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #0a0a0a; border-radius: 0 0 16px 16px; border-top: 1px solid #222222; text-align: center;">
+              <p style="color: #666666; font-size: 12px; line-height: 1.5; margin: 0;">
+                Powered by HeftCoder AI<br>
+                If you did not request this email, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        
+        <p style="color: #444444; font-size: 12px; margin-top: 24px; text-align: center;">
+          &copy; 2026 Rev Pro - All rights reserved.
+        </p>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

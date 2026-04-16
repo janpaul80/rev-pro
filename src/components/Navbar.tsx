@@ -18,7 +18,7 @@ const Navbar = () => {
         alignItems: 'center'
       }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/assets/logo_light.png" alt="REV PRO" style={{ height: '70px', width: 'auto' }} />
+          <img src="/assets/logo_light.png" alt="REV PRO" style={{ height: '100px', width: 'auto' }} />
         </Link>
         
         <div style={{ display: 'flex', gap: '2.5rem', fontSize: '1rem', color: '#999', alignItems: 'center' }}>

@@ -5,15 +5,19 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   FileText, CheckCircle, Clock, AlertCircle, 
-  Search, FolderPlus, Download, User, LogOut,
-  Bookmark, ChevronDown, Settings, CreditCard,
-  Loader2
+  Settings, ChevronDown, Zap, Activity, Folder, Plus, Download,
+  CreditCard, Loader2, ShieldCheck, MoreVertical, Trash2,
+  Search, User, LogOut, Bookmark
 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
+import ViralHeatmap from '@/components/ViralHeatmap';
 
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [transcriptions, setTranscriptions] = useState<any[]>([]);
+  const [usageLogs, setUsageLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -24,6 +28,11 @@ export default function Dashboard() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [planTier, setPlanTier] = useState<string>('Free');
+  const [folders, setFolders] = useState<any[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -73,6 +82,28 @@ export default function Dashboard() {
         setTranscriptions(data);
       }
 
+      // Fetch usage logs for charting
+      const { data: logs } = await supabase
+        .from('usage_logs')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: true });
+      
+      if (logs) {
+        setUsageLogs(logs);
+      }
+
+      // Fetch Folders
+      const { data: folderData } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('name', { ascending: true });
+        
+      if (folderData) {
+        setFolders(folderData);
+      }
+
       // Fetch the plan
       const { data: planData } = await supabase
         .from('plan_tracking')
@@ -85,6 +116,39 @@ export default function Dashboard() {
       }
     }
     setLoading(false);
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setIsCreatingFolder(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      const { data, error } = await supabase
+        .from('folders')
+        .insert([{ name: newFolderName, user_id: session.user.id }])
+        .select();
+        
+      if (!error && data) {
+        setFolders([...folders, data[0]]);
+        setNewFolderName('');
+        setIsFolderModalOpen(false);
+      }
+    }
+    setIsCreatingFolder(false);
+  };
+
+  const handleAssignToFolder = async (transcriptionId: string, folderId: string | null) => {
+    const { error } = await supabase
+      .from('transcriptions')
+      .update({ folder_id: folderId })
+      .eq('id', transcriptionId);
+      
+    if (!error) {
+      setTranscriptions(transcriptions.map(t => 
+        t.id === transcriptionId ? { ...t, folder_id: folderId } : t
+      ));
+    }
   };
 
   const handleLogout = async () => {
@@ -116,6 +180,10 @@ export default function Dashboard() {
       fetchData();
     } catch (err: any) {
       setError(err.message);
+      if (err.message.includes('Limit reached')) {
+         // Optionally scroll to top to show error
+         window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -146,10 +214,19 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'Total Transcripts', value: transcriptions.length, icon: <FileText size={20} color="#fbb02e" /> },
-    { label: 'Successfully Processed', value: transcriptions.filter(t => t.status === 'completed').length, icon: <CheckCircle size={20} color="#fbb02e" /> },
-    { label: 'Currently Processing', value: transcriptions.filter(t => t.status === 'processing').length, icon: <Clock size={20} color="#fbb02e" /> },
-    { label: 'Failed/Errors', value: transcriptions.filter(t => t.status === 'failed').length, icon: <AlertCircle size={20} color="#fbb02e" /> },
+    { label: 'AI Tool Usage', value: usageLogs.filter(l => l.action_type !== 'transcription').length, icon: <Zap size={20} color="#fbb02e" /> },
+    { label: 'Credits Consumed', value: usageLogs.reduce((acc, curr) => acc + curr.credits_used, 0), icon: <Activity size={20} color="#fbb02e" /> },
+    { label: 'Success Rate', value: `${transcriptions.length > 0 ? ((transcriptions.filter(t => t.status === 'completed').length / transcriptions.length) * 100).toFixed(1) : 100}%`, icon: <CheckCircle size={20} color="#fbb02e" /> },
   ];
+
+  // Aggregating Chart Data for User
+  const dailyUsage = usageLogs.reduce((acc: any, curr: any) => {
+    const date = new Date(curr.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    acc[date] = (acc[date] || 0) + curr.credits_used;
+    return acc;
+  }, {});
+
+  const chartData = Object.entries(dailyUsage).map(([date, credits]) => ({ date, credits }));
 
   return (
     <div style={{ minHeight: '100vh', background: '#000', color: '#fff' }}>
@@ -166,9 +243,18 @@ export default function Dashboard() {
 
       {/* Header / Nav */}
       <nav style={{ padding: '1rem 2rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <img src="/assets/logo_light.png" alt="REV" style={{ height: '70px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <Link href="/">
+            <img src="/assets/logo_light.png" alt="REV" style={{ height: '70px', cursor: 'pointer' }} />
+          </Link>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#888', textDecoration: 'none', transition: 'color 0.2s', fontSize: '0.9rem' }} onMouseOver={(e) => e.currentTarget.style.color = '#fbb02e'} onMouseOut={(e) => e.currentTarget.style.color = '#888'}>
+            <span style={{ fontSize: '1.2rem' }}>←</span> Back to app
+          </Link>
+        </div>
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <button style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fbb02e'} onMouseOut={(e) => e.currentTarget.style.color = '#888'}>Documentation</button>
+          <Link href="/docs" style={{ color: '#888', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fbb02e'} onMouseOut={(e) => e.currentTarget.style.color = '#888'}>
+            Documentation
+          </Link>
           
           <div style={{ position: 'relative' }} ref={menuRef}>
             <button 
@@ -233,7 +319,14 @@ export default function Dashboard() {
                   <Settings size={16} /> Settings
                 </Link>
                 
-                <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }} />
+                {session?.user?.user_metadata?.is_admin && (
+                  <>
+                    <Link href="/admin" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#fbb02e', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(251, 176, 46, 0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                      <ShieldCheck size={16} /> Admin Portal
+                    </Link>
+                    <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }} />
+                  </>
+                )}
                 
                 <button onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', color: '#ff4444', borderRadius: '8px', cursor: 'pointer', border: 'none', background: 'transparent', textAlign: 'left', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,68,68,0.1)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
                   <LogOut size={16} /> Sign Out
@@ -276,9 +369,24 @@ export default function Dashboard() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderTop: '1px solid var(--border)' }}>
-              <button style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                <span style={{ opacity: 0.6 }}>A</span> Translate <ChevronDown size={14} />
-              </button>
+              <select 
+                value={selectedFolder || ''}
+                onChange={(e) => setSelectedFolder(e.target.value || null)}
+                style={{ 
+                  background: 'rgba(255,255,255,0.05)', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '8px', 
+                  padding: '8px 12px', 
+                  color: '#888',
+                  fontSize: '0.85rem',
+                  outline: 'none'
+                }}
+              >
+                <option value="">No Folder (Global)</option>
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>Folder: {f.name}</option>
+                ))}
+              </select>
               <button 
                 className="premium" 
                 onClick={handleTranscribe}
@@ -313,10 +421,18 @@ export default function Dashboard() {
           <div className="glass" style={{ marginBottom: '60px', padding: '2rem', borderRadius: '24px', textAlign: 'left', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Transcription Result</h2>
-              <button onClick={() => setResult(null)} style={{ background: 'transparent', color: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}>
+              <button 
+                onClick={() => setResult(null)} 
+                style={{ background: 'transparent', color: '#fff', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer' }}
+              >
                 Clear Result
               </button>
             </div>
+
+            {/* Viral Heatmap Integration */}
+            {result.heatmap && result.heatmap.length > 0 && (
+              <ViralHeatmap data={result.heatmap} />
+            )}
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
               <div style={{ background: '#0a0a0a', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -365,6 +481,35 @@ export default function Dashboard() {
               <div style={{ color: '#666', fontSize: '0.9rem' }}>{stat.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* NEW: Credit Usage Chart */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)', height: '350px' }}>
+            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Credit Consumption</h3>
+              <div style={{ fontSize: '0.85rem', color: '#666' }}>Last activity pulses</div>
+            </div>
+            <ResponsiveContainer width="100%" height="80%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#fbb02e" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#fbb02e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#111" vertical={false} />
+                <XAxis dataKey="date" stroke="#444" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#444" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ background: '#111', border: '1px solid #333', borderRadius: '8px', fontSize: '12px' }}
+                  itemStyle={{ color: '#fbb02e' }}
+                  labelStyle={{ color: '#666' }}
+                />
+                <Area type="monotone" dataKey="credits" stroke="#fbb02e" strokeWidth={2} fillOpacity={1} fill="url(#colorUsage)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Filters Bar */}
@@ -426,25 +571,44 @@ export default function Dashboard() {
             <option value="instagram">Instagram</option>
           </select>
 
-          {[
-            { icon: <FolderPlus size={16} />, label: 'All Folders' },
-            { icon: <Bookmark size={16} />, label: 'Bookmarked Only' }
-          ].map((filter, i) => (
-            <button key={i} onClick={() => alert('Folder and Bookmark filters coming soon!')} style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              background: 'rgba(255,255,255,0.05)', 
-              border: '1px solid var(--border)', 
-              padding: '10px 16px', 
-              borderRadius: '8px', 
-              whiteSpace: 'nowrap',
-              color: '#fff',
-              cursor: 'pointer'
-            }}>
-              {filter.icon} {filter.label}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              onClick={() => setIsFolderModalOpen(true)}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                background: 'rgba(251, 176, 46, 0.1)', 
+                border: '1px solid rgba(251, 176, 46, 0.3)', 
+                padding: '10px 16px', 
+                borderRadius: '8px', 
+                color: '#fbb02e',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.9rem'
+              }}>
+              <Plus size={16} /> New Folder
             </button>
-          ))}
+
+            <select 
+              value={selectedFolder || 'All'}
+              onChange={(e) => setSelectedFolder(e.target.value === 'All' ? null : e.target.value)}
+              style={{ 
+                background: 'rgba(255,255,255,0.05)', 
+                border: '1px solid var(--border)', 
+                padding: '10px 16px', 
+                borderRadius: '8px',
+                color: '#fff',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="All">All Items</option>
+              {folders.map(f => (
+                <option key={f.id} value={f.id}>📁 {f.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Empty State / Table */}
@@ -453,7 +617,8 @@ export default function Dashboard() {
             const matchSearch = !searchQuery || t.url?.includes(searchQuery) || t.platform?.includes(searchQuery);
             const matchStatus = statusFilter === 'All' || t.status === statusFilter;
             const matchPlatform = platformFilter === 'All' || t.platform === platformFilter;
-            return matchSearch && matchStatus && matchPlatform;
+            const matchFolder = !selectedFolder || t.folder_id === selectedFolder;
+            return matchSearch && matchStatus && matchPlatform && matchFolder;
           });
 
           return loading ? (
@@ -472,7 +637,7 @@ export default function Dashboard() {
                     <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500' }}>Platform</th>
                     <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500' }}>URL</th>
                     <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500' }}>Status</th>
-                    <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500' }}>Date</th>
+                    <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500' }}>Folder</th>
                     <th style={{ padding: '1rem 1.5rem', color: '#888', fontWeight: '500', textAlign: 'right' }}>Action</th>
                   </tr>
                 </thead>
@@ -495,13 +660,26 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem 1.5rem', color: '#888' }}>
-                         {new Date(t.created_at).toLocaleDateString()}
+                         <select 
+                           value={t.folder_id || ''}
+                           onChange={(e) => handleAssignToFolder(t.id, e.target.value || null)}
+                           style={{ background: 'transparent', border: 'none', color: '#444', fontSize: '0.85rem', cursor: 'pointer', outline: 'none' }}
+                         >
+                           <option value="">None</option>
+                           {folders.map(f => (
+                             <option key={f.id} value={f.id}>{f.name}</option>
+                           ))}
+                         </select>
                       </td>
                       <td style={{ padding: '1rem 1.5rem', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                         <button 
                           onClick={() => {
                             if (t.status === 'completed') {
-                              setResult({ transcript: t.transcript, refined: t.refined });
+                              setResult({ 
+                                transcript: t.transcript, 
+                                refined: t.refined,
+                                heatmap: t.retention_data // Map DB column to component prop
+                              });
                             } else {
                               alert(t.status === 'processing' ? 'Transcription is still processing' : 'Transcription failed');
                             }
@@ -524,6 +702,56 @@ export default function Dashboard() {
             </div>
           );
         })()}
+
+        {/* Folder Creator Modal */}
+        {isFolderModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass" 
+              style={{ width: '100%', maxWidth: '400px', padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)' }}
+            >
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>Create New Folder</h3>
+              <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Organize your transcription projects (e.g., "Client A", "Podcast Series").</p>
+              
+              <input 
+                type="text" 
+                placeholder="Folder Name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                autoFocus
+                style={{ 
+                  width: '100%', 
+                  background: 'rgba(255,255,255,0.05)', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '12px', 
+                  padding: '12px 16px', 
+                  color: '#fff', 
+                  marginBottom: '1.5rem',
+                  outline: 'none'
+                }}
+              />
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => setIsFolderModalOpen(false)}
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px', color: '#fff' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleCreateFolder}
+                  disabled={isCreatingFolder || !newFolderName}
+                  className="premium"
+                  style={{ flex: 1, background: '#fbb02e', color: '#000', border: 'none', borderRadius: '12px', padding: '12px', fontWeight: 'bold' }}
+                >
+                  {isCreatingFolder ? 'Creating...' : 'Create Folder'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );

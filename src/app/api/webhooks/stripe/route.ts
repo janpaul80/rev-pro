@@ -27,23 +27,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
-  // Handle the checkout.session.completed event
+  // Setup Supabase Admin
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVIC_ROLE_KEY!
+  );
+
+  // 1. Handle Checkout completion (Initial Purchase)
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    
-    // Retrieve the user ID we passed into the checkout session
     const userId = session.client_reference_id;
-    const planTier = session.metadata?.planTier || 'basic'; // The plan they just bought
+    const planTier = session.metadata?.planTier || 'basic';
 
     if (userId) {
-      // Connect to supabase with SERVICE ROLE to bypass RLS
-      const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVIC_ROLE_KEY!
-      );
-
-      // Upgrade plan to the new tier
-      const { error } = await supabaseAdmin
+      // Upgrade plan
+      await supabaseAdmin
         .from('plan_tracking')
         .update({ 
           plan_tier: planTier, 
@@ -53,12 +51,39 @@ export async function POST(req: Request) {
         })
         .eq('user_id', userId);
 
-      if (error) {
-        console.error(`Supabase sync failed: ${error.message}`);
-        // Consider alerting ops, but return 200 to Stripe so it doesn't retry infinitely
-      } else {
-        console.log(`Successfully upgraded user ${userId} to ${planTier} plan.`);
+      // Log Revenue (if amount is available)
+      if (session.amount_total) {
+        await supabaseAdmin.from('revenue_logs').insert({
+          user_id: userId,
+          stripe_id: session.id,
+          amount_cents: session.amount_total,
+          currency: session.currency || 'usd',
+          plan_tier: planTier
+        });
       }
+    }
+  }
+
+  // 2. Handle Invoice Paid (Recurring Renewals)
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId = invoice.customer as string;
+    
+    // Find user by stripe_customer_id
+    const { data: userData } = await supabaseAdmin
+      .from('plan_tracking')
+      .select('user_id, plan_tier')
+      .eq('stripe_customer_id', customerId)
+      .single();
+
+    if (userData) {
+      await supabaseAdmin.from('revenue_logs').insert({
+        user_id: userData.user_id,
+        stripe_id: invoice.id,
+        amount_cents: invoice.amount_paid,
+        currency: invoice.currency || 'usd',
+        plan_tier: userData.plan_tier
+      });
     }
   }
 

@@ -1,0 +1,39 @@
+services:
+  rev-pro:
+    build: .
+    container_name: rev-pro-app
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    networks:
+      - rev-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: rev-pro-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/certbot/www:/var/www/certbot
+    depends_on:
+      - rev-pro
+    networks:
+      - rev-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: rev-pro-certbot
+    volumes:
+      - ./nginx/ssl:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --force-renewal -d rev-pro.dev -d www.rev-pro.dev --email admin@rev-pro.dev --agree-tos --non-interactive
+
+networks:
+  rev-network:
+    driver: bridge
