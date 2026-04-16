@@ -18,60 +18,72 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            set -e # Exit immediately if a command exits with a non-zero status
+            set -ex # Exit immediately on error AND print every command executed
             
-            # 1. Ensure project directory exists in Home (safe location)
+            # Detect Docker/Docker-compose before anything else
+            if command -v docker-compose >/dev/null 2>&1; then
+              DOCKER_CMD="docker-compose"
+            elif docker compose version >/dev/null 2>&1; then
+              DOCKER_CMD="docker compose"
+            else
+              echo "❌ Error: Docker Compose not found in PATH"
+              exit 1
+            fi
+            echo "🐳 Using $DOCKER_CMD"
+
+            # 1. Ensure project directory and Git repo
             PROJECT_DIR="$HOME/rev-pro"
             if [ ! -d "$PROJECT_DIR" ]; then
-              echo "📂 Creating project directory at $PROJECT_DIR"
+              echo "📂 Creating project directory..."
               mkdir -p "$PROJECT_DIR"
-              git clone https://github.com/janpaul80/rev-pro.git "$PROJECT_DIR"
             fi
             
             cd "$PROJECT_DIR"
-            echo "📥 Pulling latest changes..."
-            git pull origin main
             
-            # 2. Detect Docker Compose version
-            if docker compose version >/dev/null 2>&1; then
-              DOCKER_CMD="docker compose"
+            # Use GITHUB_TOKEN for seamless clone/pull (even if private)
+            REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/janpaul80/rev-pro.git"
+            
+            if [ ! -d ".git" ]; then
+              echo "📥 Fresh clone of repository..."
+              git clone "$REPO_URL" .
             else
-              DOCKER_CMD="docker-compose"
+              echo "📥 Pulling latest updates..."
+              git remote set-url origin "$REPO_URL"
+              git fetch origin
+              git reset --hard origin/main
             fi
-            echo "🐳 Using $DOCKER_CMD"
             
-            # 3. Ensure production environment file
-            # Note: We skip complex secret injection in bootstrap to avoid failures if secrets are missing
+            # 2. Ensure Environment Configuration
             if [ ! -f ".env.production" ]; then
               echo "NEXT_PUBLIC_URL=https://rev-pro.dev" > .env.production
             fi
             
-            # 4. Bootstrap SSL (If certs are missing)
+            # 3. SSL Bootstrap logic
+            # We assume if the SSL dir is missing, we need to bootstrap
             if [ ! -d "./nginx/ssl/live/rev-pro.dev" ]; then
-              echo "🚀 Starting SSL Bootstrap..."
-              # Start Nginx in bootstrap mode
+              echo "🚀 Starting SSL Bootstrap flow..."
+              # Backup real config, start Nginx on Port 80
               [ -f "./nginx/conf.d/rev-pro.conf" ] && mv ./nginx/conf.d/rev-pro.conf ./nginx/conf.d/rev-pro.conf.bak
               $DOCKER_CMD up -d --build
               
-              # Wait for Nginx
-              echo "⏳ Waiting for Nginx..."
-              sleep 15
+              echo "⏳ Waiting for domain validation..."
+              sleep 20
               
-              # Request SSL
-              echo "🔐 Requesting SSL certificates..."
+              # Run Certbot
+              echo "🔐 Acquiring SSL Certs..."
               $DOCKER_CMD run --rm certbot
               
-              # Restore full config
-              echo "🔄 Finalizing SSL configuration..."
+              # Re-enable full SSL Nginx config
+              echo "🔄 Switching to secure HTTPS mode..."
               [ -f "./nginx/conf.d/rev-pro.conf.bak" ] && mv ./nginx/conf.d/rev-pro.conf.bak ./nginx/conf.d/rev-pro.conf
-              [ -f "./nginx/conf.d/bootstrap.conf" ] && rm ./nginx/conf.d/bootstrap.conf
-              $DOCKER_CMD restart nginx
+              [ -f "./nginx/conf.d/bootstrap.conf" ] && rm -f ./nginx/conf.d/bootstrap.conf
+              $DOCKER_CMD up -d --build --force-recreate nginx
             else
-              # Standard Deployment
-              echo "🚢 Standard deployment update..."
+              # Regular Update
+              echo "🚢 Regular production update..."
               $DOCKER_CMD down
-              $DOCKER_CMD build --no-cache
-              $DOCKER_CMD up -d
+              $DOCKER_CMD pull
+              $DOCKER_CMD up -d --build
             fi
             
             echo "✅ Rev.pro deployed successfully at $(date)"
