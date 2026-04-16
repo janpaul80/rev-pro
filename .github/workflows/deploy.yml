@@ -18,44 +18,60 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # 1. Ensure project directory exists
-            if [ ! -d "/opt/rev-pro" ]; then
-              sudo mkdir -p /opt/rev-pro
-              sudo chown $USER:$USER /opt/rev-pro
-              git clone https://github.com/janpaul80/rev-pro.git /opt/rev-pro
+            set -e # Exit immediately if a command exits with a non-zero status
+            
+            # 1. Ensure project directory exists in Home (safe location)
+            PROJECT_DIR="$HOME/rev-pro"
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "📂 Creating project directory at $PROJECT_DIR"
+              mkdir -p "$PROJECT_DIR"
+              git clone https://github.com/janpaul80/rev-pro.git "$PROJECT_DIR"
             fi
             
-            cd /opt/rev-pro
+            cd "$PROJECT_DIR"
+            echo "📥 Pulling latest changes..."
             git pull origin main
             
-            # 2. Ensure staging environment file exists
+            # 2. Detect Docker Compose version
+            if docker compose version >/dev/null 2>&1; then
+              DOCKER_CMD="docker compose"
+            else
+              DOCKER_CMD="docker-compose"
+            fi
+            echo "🐳 Using $DOCKER_CMD"
+            
+            # 3. Ensure production environment file
+            # Note: We skip complex secret injection in bootstrap to avoid failures if secrets are missing
             if [ ! -f ".env.production" ]; then
               echo "NEXT_PUBLIC_URL=https://rev-pro.dev" > .env.production
-              echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> .env.production
             fi
             
-            # 3. Bootstrap SSL (If certs are missing)
+            # 4. Bootstrap SSL (If certs are missing)
             if [ ! -d "./nginx/ssl/live/rev-pro.dev" ]; then
               echo "🚀 Starting SSL Bootstrap..."
               # Start Nginx in bootstrap mode
-              mv ./nginx/conf.d/rev-pro.conf ./nginx/conf.d/rev-pro.conf.bak
-              docker compose up -d --build
+              [ -f "./nginx/conf.d/rev-pro.conf" ] && mv ./nginx/conf.d/rev-pro.conf ./nginx/conf.d/rev-pro.conf.bak
+              $DOCKER_CMD up -d --build
               
-              # Wait for Nginx to be ready
-              sleep 10
+              # Wait for Nginx
+              echo "⏳ Waiting for Nginx..."
+              sleep 15
               
               # Request SSL
-              docker compose run --rm certbot
+              echo "🔐 Requesting SSL certificates..."
+              $DOCKER_CMD run --rm certbot
               
               # Restore full config
-              mv ./nginx/conf.d/rev-pro.conf.bak ./nginx/conf.d/rev-pro.conf
-              rm ./nginx/conf.d/bootstrap.conf
-              docker compose restart nginx
+              echo "🔄 Finalizing SSL configuration..."
+              [ -f "./nginx/conf.d/rev-pro.conf.bak" ] && mv ./nginx/conf.d/rev-pro.conf.bak ./nginx/conf.d/rev-pro.conf
+              [ -f "./nginx/conf.d/bootstrap.conf" ] && rm ./nginx/conf.d/bootstrap.conf
+              $DOCKER_CMD restart nginx
             else
               # Standard Deployment
-              docker compose down
-              docker compose build --no-cache
-              docker compose up -d
+              echo "🚢 Standard deployment update..."
+              $DOCKER_CMD down
+              $DOCKER_CMD build --no-cache
+              $DOCKER_CMD up -d
             fi
             
             echo "✅ Rev.pro deployed successfully at $(date)"
