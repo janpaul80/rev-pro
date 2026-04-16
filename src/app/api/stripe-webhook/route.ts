@@ -2,12 +2,21 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_KEY || '';
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
+  // Lazy init to bypass build-time crashes
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Stripe key missing' }, { status: 500 });
+  }
+  
+  const stripe = new Stripe(key || 'placeholder');
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_KEY || '';
   const body = await req.text();
   const signature = (await headers()).get('stripe-signature') as string;
+  const dynamic = "force-dynamic";
 
   let event: Stripe.Event;
 

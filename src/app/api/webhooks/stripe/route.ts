@@ -3,9 +3,16 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // Lazy init to bypass build-time crashes
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Stripe key missing' }, { status: 500 });
+  }
+
+  const stripe = new Stripe(key || 'placeholder', {
     apiVersion: '2023-10-16' as any,
   });
 
@@ -45,8 +52,8 @@ export async function POST(req: Request) {
       // Upgrade plan
       await supabaseAdmin
         .from('plan_tracking')
-        .update({ 
-          plan_tier: planTier, 
+        .update({
+          plan_tier: planTier,
           status: 'active',
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string
@@ -70,7 +77,7 @@ export async function POST(req: Request) {
   if (event.type === 'invoice.paid') {
     const invoice = event.data.object as Stripe.Invoice;
     const customerId = invoice.customer as string;
-    
+
     // Find user by stripe_customer_id
     const { data: userData } = await supabaseAdmin
       .from('plan_tracking')
