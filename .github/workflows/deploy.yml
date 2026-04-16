@@ -18,9 +18,44 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            # 1. Ensure project directory exists
+            if [ ! -d "/opt/rev-pro" ]; then
+              sudo mkdir -p /opt/rev-pro
+              sudo chown $USER:$USER /opt/rev-pro
+              git clone https://github.com/janpaul80/rev-pro.git /opt/rev-pro
+            fi
+            
             cd /opt/rev-pro
             git pull origin main
-            docker compose down
-            docker compose build --no-cache
-            docker compose up -d
+            
+            # 2. Ensure staging environment file exists
+            if [ ! -f ".env.production" ]; then
+              echo "NEXT_PUBLIC_URL=https://rev-pro.dev" > .env.production
+              echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> .env.production
+            fi
+            
+            # 3. Bootstrap SSL (If certs are missing)
+            if [ ! -d "./nginx/ssl/live/rev-pro.dev" ]; then
+              echo "🚀 Starting SSL Bootstrap..."
+              # Start Nginx in bootstrap mode
+              mv ./nginx/conf.d/rev-pro.conf ./nginx/conf.d/rev-pro.conf.bak
+              docker compose up -d --build
+              
+              # Wait for Nginx to be ready
+              sleep 10
+              
+              # Request SSL
+              docker compose run --rm certbot
+              
+              # Restore full config
+              mv ./nginx/conf.d/rev-pro.conf.bak ./nginx/conf.d/rev-pro.conf
+              rm ./nginx/conf.d/bootstrap.conf
+              docker compose restart nginx
+            else
+              # Standard Deployment
+              docker compose down
+              docker compose build --no-cache
+              docker compose up -d
+            fi
+            
             echo "✅ Rev.pro deployed successfully at $(date)"

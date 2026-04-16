@@ -18,13 +18,17 @@ const Navbar = () => {
         alignItems: 'center'
       }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/assets/logo_light.png" alt="REV PRO" style={{ height: '100px', width: 'auto' }} />
+          <img src="/logo_revpro.png" alt="REV PRO" style={{ height: '120px', width: 'auto', filter: 'brightness(1.2)' }} />
         </Link>
         
         <div style={{ display: 'flex', gap: '2.5rem', fontSize: '1rem', color: '#999', alignItems: 'center' }}>
           <Link href="/about" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = '#999'}>About</Link>
           <Link href="/pricing" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = '#999'}>Pricing</Link>
-          <Link href="/contact" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = '#999'}>Contact</Link>
+          <Link href="/contact-sales" style={{ 
+            transition: 'color 0.2s', 
+            color: '#fbb02e',
+            fontWeight: '600'
+          }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = '#fbb02e'}>Contact Sales</Link>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
