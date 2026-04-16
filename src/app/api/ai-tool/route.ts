@@ -6,17 +6,14 @@ const USE_MOCK = process.env.USE_MOCK_TRANSCRIPTION === 'true';
 const LANGDOCK_API_KEY = process.env.LANGDOCK_API_KEY!;
 const LANGDOCK_AGENT_ID = process.env.LANGDOCK_REV_AI_AGENT_ID!;
 
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVIC_ROLE_KEY!
-);
+export const dynamic = 'force-dynamic';
 
-const creditLimits: Record<string, number> = {
-  free: 5,
-  basic: 50,
-  pro: Number.MAX_SAFE_INTEGER
-};
 export async function POST(req: Request) {
+  const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const { action, transcript, userId } = await req.json();
     const startTime = Date.now();
