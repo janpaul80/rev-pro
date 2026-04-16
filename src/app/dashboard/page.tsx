@@ -9,10 +9,15 @@ import {
   CreditCard, Loader2, ShieldCheck, MoreVertical, Trash2,
   Search, User, LogOut, Bookmark
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { motion } from 'framer-motion';
+import { 
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+} from 'recharts';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import ViralHeatmap from '@/components/ViralHeatmap';
+import BatchMonitor, { BatchItem } from '@/components/BatchMonitor';
+import { exportToCSV } from '@/utils/csvExport';
 
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
@@ -33,6 +38,10 @@ export default function Dashboard() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence' | 'history'>('overview');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -162,11 +171,20 @@ export default function Dashboard() {
     setError(null);
     setResult(null);
 
+    const urls = urlInput.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+    
+    // If more than 1 URL, switch to bulk mode automatically or handle as batch
+    if (urls.length > 1) {
+      handleBulkSubmit(urls);
+      setIsProcessing(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlInput, userId: session?.user?.id })
+        body: JSON.stringify({ url: urls[0], userId: session?.user?.id })
       });
 
       const data = await response.json();
@@ -176,18 +194,135 @@ export default function Dashboard() {
       }
 
       setResult(data);
-      // Refresh the history after successful transcription
       fetchData();
     } catch (err: any) {
       setError(err.message);
       if (err.message.includes('Limit reached')) {
-         // Optionally scroll to top to show error
          window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } finally {
       setIsProcessing(false);
     }
   };
+
+  const handleBulkSubmit = (urls: string[]) => {
+    // Plan Gating logic
+    const limit = planTier === 'Pro' ? 50 : planTier === 'Basic' ? 10 : 0;
+    
+    if (limit === 0) {
+      setError("Batch processing is only available for Pro & Basic plans.");
+      return;
+    }
+    
+    if (urls.length > limit) {
+      setError(`Your plan allows max ${limit} URLs per batch. Please upgrade to Pro for more.`);
+      return;
+    }
+
+    const items: BatchItem[] = urls.map((url, i) => ({
+      id: `batch-${Date.now()}-${i}`,
+      url,
+      status: 'pending'
+    }));
+
+    setBatchItems(items);
+    setIsBulkMode(true);
+    processQueue(items);
+  };
+
+  const processQueue = async (initialItems: BatchItem[]) => {
+    const concurrency = 3;
+    let currentIdx = 0;
+    const items = [...initialItems];
+
+    const worker = async () => {
+      while (currentIdx < items.length) {
+        const i = currentIdx++;
+        const item = items[i];
+        
+        // Update to processing
+        setBatchItems(prev => prev.map(pi => pi.id === item.id ? { ...pi, status: 'processing' } : pi));
+
+        try {
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: item.url, userId: session?.user?.id })
+          });
+          
+          const data = await res.json();
+          
+          if (!res.ok) throw new Error(data.error || 'Failed');
+
+          setBatchItems(prev => prev.map(pi => pi.id === item.id ? { 
+            ...pi, 
+            status: 'completed', 
+            transcript: data.transcript, 
+            refined: data.refined 
+          } : pi));
+        } catch (err: any) {
+          setBatchItems(prev => prev.map(pi => pi.id === item.id ? { 
+            ...pi, 
+            status: 'failed', 
+            error: err.message 
+          } : pi));
+        }
+      }
+    };
+
+    // Fire off parallel workers
+    const workers = Array(Math.min(concurrency, items.length)).fill(null).map(() => worker());
+    await Promise.all(workers);
+    fetchData(); // Final refresh
+  };
+
+  const handleTabChange = (tab: 'overview' | 'intelligence' | 'history') => {
+    if (tab === 'intelligence') {
+      setIsAnalyzing(true);
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        setActiveTab(tab);
+      }, 1500);
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  // Memoized calculations for Intelligence Tab
+  const intelligenceData = React.useMemo(() => {
+    if (transcriptions.length === 0) return null;
+
+    const completed = transcriptions.filter(t => t.status === 'completed');
+    
+    // 1. Platform Benchmarking (Radar Chart)
+    const platforms = ['TikTok', 'YouTube', 'Instagram'];
+    const radarData = platforms.map(p => {
+      const platformItems = completed.filter(item => item.platform?.toLowerCase() === p.toLowerCase());
+      const avgScore = platformItems.length > 0 
+        ? platformItems.reduce((acc, curr) => acc + (curr.retention_data?.viral_score || 0), 0) / platformItems.length
+        : 0;
+      return { subject: p, A: Math.round(avgScore), fullMark: 100 };
+    });
+
+    // 2. Viral Trendline (Last 20)
+    const trendData = [...completed].reverse().slice(-10).map((t, i) => ({
+      index: i + 1,
+      score: t.retention_data?.viral_score || 0,
+      title: t.url?.substring(0, 20) || `Video ${i+1}`
+    }));
+
+    // 3. The Hook Lab (Top 5 hooks by score)
+    const topHooks = completed
+      .sort((a, b) => (b.retention_data?.viral_score || 0) - (a.retention_data?.viral_score || 0))
+      .slice(0, 5)
+      .map(t => ({
+        score: t.retention_data?.viral_score || 0,
+        text: t.refined?.split('.')[0] + '...', // First sentence as the hook
+        platform: t.platform
+      }));
+
+    return { radarData, trendData, topHooks };
+  }, [transcriptions]);
 
   const handleDownload = (transcript: string, platform: string, id: string) => {
     if (!transcript) {
@@ -203,6 +338,22 @@ export default function Dashboard() {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  };
+
+  const handleClearBatch = () => {
+    setBatchItems([]);
+    setIsBulkMode(false);
+  };
+
+  const handleBatchRetry = (id: string) => {
+    const item = batchItems.find(i => i.id === id);
+    if (item) {
+      processQueue([item]);
+    }
+  };
+
+  const handleBulkExport = () => {
+    exportToCSV(batchItems.filter(i => i.status === 'completed'));
   };
 
   const getUserInitial = () => {
@@ -337,7 +488,57 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="container" style={{ padding: '40px 20px' }}>
+      <div className="container" style={{ padding: '40px 20px', position: 'relative' }}>
+        {/* Intelligence Analysis Overlay */}
+        <AnimatePresence>
+          {isAnalyzing && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 10000, 
+                background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(10px)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2rem'
+              }}
+            >
+              <Loader2 size={60} className="spin" color="#fbb02e" />
+              <div style={{ textAlign: 'center' }}>
+                <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem' }}>Analyzing Intelligence...</h2>
+                <p style={{ color: '#666' }}>Recalculating virality benchmarks across your niche.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tab Switcher */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3rem' }}>
+          <div className="glass" style={{ padding: '6px', borderRadius: '16px', display: 'inline-flex', gap: '4px', border: '1px solid var(--border)' }}>
+            {[
+              { id: 'overview', label: 'Overview', icon: <Zap size={16} /> },
+              { id: 'intelligence', label: 'Intelligence', icon: <Activity size={16} /> },
+              { id: 'history', label: 'History', icon: <Clock size={16} /> }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id as any)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 20px', borderRadius: '12px',
+                  background: activeTab === tab.id ? '#fbb02e' : 'transparent',
+                  color: activeTab === tab.id ? '#000' : '#888',
+                  border: 'none', cursor: 'pointer', fontWeight: '600',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === 'overview' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         {/* Paste Link Section */}
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>Paste your video link here</h1>
@@ -416,8 +617,18 @@ export default function Dashboard() {
           `}} />
         </div>
 
+        {/* Batch Processing Monitor */}
+        {isBulkMode && (
+          <BatchMonitor 
+            items={batchItems} 
+            onExport={handleBulkExport}
+            onClear={handleClearBatch}
+            onRetry={handleBatchRetry}
+          />
+        )}
+
         {/* Result Area (appended if successful transcription just completed) */}
-        {result && (
+        {!isBulkMode && result && (
           <div className="glass" style={{ marginBottom: '60px', padding: '2rem', borderRadius: '24px', textAlign: 'left', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.8rem', fontWeight: '700' }}>Transcription Result</h2>
@@ -451,8 +662,95 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </motion.div>
+    )}
 
-        {/* Stats Title */}
+    {/* Intelligence Tab Content */}
+    {activeTab === 'intelligence' && intelligenceData && (
+      <motion.div key="intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+          {/* Radar Chart: Platform Strength */}
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)', minHeight: '400px' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '800', marginBottom: '2rem' }}>Platform Benchmarking</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={intelligenceData.radarData}>
+                <PolarGrid stroke="#333" />
+                <PolarAngleAxis dataKey="subject" stroke="#888" fontSize={12} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#444" axisLine={false} tick={false} />
+                <Radar
+                  name="Viral Potential"
+                  dataKey="A"
+                  stroke="#fbb02e"
+                  fill="#fbb02e"
+                  fillOpacity={0.6}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+            <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '1rem', textAlign: 'center' }}>
+              Relative score intensity based on historical AI content audits.
+            </p>
+          </div>
+
+          {/* Trendline: Retention Scores */}
+          <div className="glass" style={{ padding: '2rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '800', marginBottom: '2rem' }}>Performance Velocity</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={intelligenceData.trendData}>
+                <defs>
+                  <linearGradient id="colorViral" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#fbb02e" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#fbb02e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
+                <XAxis dataKey="index" stroke="#444" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} stroke="#444" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ background: '#111', border: '1px solid #333', borderRadius: '8px' }}
+                  itemStyle={{ color: '#fbb02e' }}
+                />
+                <Area type="monotone" dataKey="score" stroke="#fbb02e" strokeWidth={3} fillOpacity={1} fill="url(#colorViral)" />
+              </AreaChart>
+            </ResponsiveContainer>
+            <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '1rem', textAlign: 'center' }}>
+              Trend Analysis: Last 10 videos (Viral Potential Scores).
+            </p>
+          </div>
+        </div>
+
+        {/* The Hook Lab */}
+        <div className="glass" style={{ padding: '3rem', borderRadius: '24px', border: '1px solid var(--border)', marginBottom: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ padding: '12px', background: 'rgba(251, 176, 46, 0.1)', borderRadius: '12px' }}>
+              <Bookmark color="#fbb02e" size={24} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '800' }}>The Hook Lab</h3>
+              <p style={{ color: '#666' }}>Engineered patterns from your highest-performing videos</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            {intelligenceData.topHooks.map((hook, i) => (
+              <div key={i} style={{ background: '#0a0a0a', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <span style={{ color: '#fbb02e', fontWeight: '800', fontSize: '0.8rem' }}>SCORE: {hook.score}</span>
+                  <span style={{ color: '#444', fontSize: '0.7rem' }}>{hook.platform}</span>
+                </div>
+                <p style={{ color: '#ccc', fontStyle: 'italic', lineHeight: '1.6' }}>"{hook.text}"</p>
+              </div>
+            ))}
+            {intelligenceData.topHooks.length === 0 && (
+              <p style={{ color: '#444' }}>Process more videos to unlock automated hook intelligence metrics.</p>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    )}
+
+    {/* History Tab Content */}
+    {activeTab === 'history' && (
+      <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
           <div>
             <h2 style={{ fontSize: '2rem', fontWeight: '700' }}>Transcript <span style={{ color: '#fbb02e' }}>History</span></h2>
@@ -702,6 +1000,8 @@ export default function Dashboard() {
             </div>
           );
         })()}
+      </motion.div>
+    )}
 
         {/* Folder Creator Modal */}
         {isFolderModalOpen && (
