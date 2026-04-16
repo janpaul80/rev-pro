@@ -8,10 +8,14 @@ const LANGDOCK_API_KEY = process.env.LANGDOCK_API_KEY!;
 const LANGDOCK_AGENT_ID = process.env.LANGDOCK_REV_AI_AGENT_ID!;
 const LANGDOCK_ENDPOINT = process.env.LANGDOCK_ENDPOINT_URL!;
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVIC_ROLE_KEY!
-);
+export const dynamic = 'force-dynamic';
+
+function getSupabase() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // Detect platform from URL
 function detectPlatform(url: string): string {
@@ -60,6 +64,7 @@ async function fetchWithRetry(
 }
 
 async function checkCredits(userId: string) {
+  const supabase = getSupabase();
   // 1. Get user plan
   const { data: planData } = await supabase
     .from('plan_tracking')
@@ -129,6 +134,7 @@ function getMockResponse(url: string, platform: string) {
 }
 
 export async function POST(req: Request) {
+  const supabase = getSupabase();
   const startTime = Date.now();
   let userId: string | undefined;
   let platform: string = 'unknown';
