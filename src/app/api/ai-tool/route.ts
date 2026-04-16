@@ -8,6 +8,12 @@ const LANGDOCK_AGENT_ID = process.env.LANGDOCK_REV_AI_AGENT_ID!;
 
 export const dynamic = 'force-dynamic';
 
+const creditLimits: Record<string, number> = {
+  free: 5,
+  basic: 50,
+  pro: Number.MAX_SAFE_INTEGER
+};
+
 export async function POST(req: Request) {
   const supabaseAdmin = createClient(
     process.env.SUPABASE_URL!,
