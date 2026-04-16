@@ -1,3 +1,10 @@
+import Navbar from '../components/Navbar';
+import Hero from '../components/Hero';
+import Features from '../components/Features';
+import UseCases from '../components/UseCases';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
+import Testimonials from '../components/Testimonials';
+import Footer from '../components/Footer';
 import { BarChart3, Binary, BrainCircuit, Rocket, Shield, Users } from 'lucide-react';
 
 export default function Home() {
