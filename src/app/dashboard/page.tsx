@@ -1,6 +1,7 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -19,7 +20,7 @@ import ViralHeatmap from '@/components/ViralHeatmap';
 import BatchMonitor, { BatchItem } from '@/components/BatchMonitor';
 import { exportToCSV } from '@/utils/csvExport';
 
-export default function Dashboard() {
+function DashboardContent() {
   const [session, setSession] = useState<any>(null);
   const [transcriptions, setTranscriptions] = useState<any[]>([]);
   const [usageLogs, setUsageLogs] = useState<any[]>([]);
@@ -1054,5 +1055,13 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
