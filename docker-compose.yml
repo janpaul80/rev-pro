@@ -19,8 +19,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-      - ./nginx/certbot/www:/var/www/certbot
+      - certbot-etc:/etc/nginx/ssl
+      - certbot-www:/var/www/certbot
     depends_on:
       - rev-pro
     networks:
@@ -30,10 +30,14 @@ services:
     image: certbot/certbot
     container_name: rev-pro-certbot
     volumes:
-      - ./nginx/ssl:/etc/letsencrypt
-      - ./nginx/certbot/www:/var/www/certbot
+      - certbot-etc:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
     command: certonly --webroot -w /var/www/certbot --force-renewal -d rev-pro.dev -d www.rev-pro.dev --email admin@rev-pro.dev --agree-tos --non-interactive
 
 networks:
   rev-network:
     driver: bridge
+
+volumes:
+  certbot-etc:
+  certbot-www:
