@@ -6,14 +6,10 @@ set -e
 
 echo "=== Rev-Pro Deploy ==="
 
-# Clone
-cd /opt
-rm -rf rev-pro
-git clone https://github.com/janpaul80/rev-pro.git
-cd rev-pro
-
-# Use .env.production from /opt
-cp /opt/.env.production .env.production
+# Ensure we use .env.production from /opt if available
+if [ -f /opt/.env.production ]; then
+    cp /opt/.env.production .env.production
+fi
 
 # Build
 docker compose down || true
