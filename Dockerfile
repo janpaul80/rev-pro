@@ -18,7 +18,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apk add --no-cache python3 py3-pip ffmpeg bash
 COPY --from=builder /app .
-RUN python3 -m pip install --no-cache-dir yt-dlp
+RUN python3 -m pip install --no-cache-dir --break-system-packages yt-dlp
 
 EXPOSE 3000
 CMD ["npm", "start"]
