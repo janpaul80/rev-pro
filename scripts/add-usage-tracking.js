@@ -8,7 +8,7 @@ async function main() {
     return a; 
   }, {});
 
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVIC_ROLE_KEY);
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
   // We are going to execute a raw SQL query via postgres if supported, or via an edge function. 
   // However, Supabase JS API doesn't support raw DDL inherently unless using RPC.

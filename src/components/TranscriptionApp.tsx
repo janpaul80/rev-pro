@@ -49,7 +49,7 @@ const TranscriptionApp = () => {
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url, userId: authSession?.user?.id })
       });
 
       const data = await response.json();
@@ -278,7 +278,7 @@ const TranscriptionApp = () => {
       </div>
 
       {mode === 'single' ? (
-        <div className="glass" style={{
+        <div className="glass transcription-input-container" style={{
           padding: '8px',
           borderRadius: '16px',
           display: 'flex',
@@ -298,17 +298,31 @@ const TranscriptionApp = () => {
               color: '#fff',
               padding: '12px 20px',
               fontSize: '1rem',
-              outline: 'none'
+              outline: 'none',
+              minWidth: '0'
             }}
           />
           <button 
-            className="premium" 
+            className="premium transcribe-btn" 
             onClick={handleTranscribe}
             disabled={isProcessing}
             style={{ minWidth: '140px', borderRadius: '12px' }}
           >
             {isProcessing ? 'Processing...' : 'Transcribe'}
           </button>
+          
+          <style jsx>{`
+            @media (max-width: 640px) {
+              .transcription-input-container {
+                flex-direction: column;
+                padding: 12px;
+              }
+              .transcribe-btn {
+                width: 100%;
+                min-width: unset !important;
+              }
+            }
+          `}</style>
         </div>
       ) : (
         <div className="glass" style={{ padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>

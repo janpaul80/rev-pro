@@ -119,10 +119,17 @@ h1, h2, h3 {
 
 /* ========== MOBILE RESPONSIVENESS ========== */
 
+/* Large Tablet / Desktop */
+@media (max-width: 1024px) {
+  .nav-links-desktop {
+    gap: 1.5rem !important;
+  }
+}
+
 /* Tablet breakpoint */
 @media (max-width: 768px) {
   .container {
-    padding: 0 1.25rem;
+    padding: 0 1.5rem;
   }
 
   section {
@@ -130,39 +137,35 @@ h1, h2, h3 {
   }
 
   h1 {
-    font-size: 2.5rem !important;
+    font-size: 3rem !important;
+    line-height: 1.2 !important;
   }
 
   h2 {
-    font-size: 2rem !important;
+    font-size: 2.25rem !important;
   }
 
-  /* Navbar mobile: stack nav items */
-  nav .container {
-    flex-wrap: wrap;
-    gap: 0.75rem;
+  /* Grid stacking */
+  .grid-2, .grid-3 {
+    grid-template-columns: 1fr !important;
   }
 
-  nav .container > div:nth-child(2) {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-    gap: 1.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border);
+  /* Hero adjustments */
+  section[style*="paddingTop: 160px"] {
+    padding-top: 120px !important;
   }
 
-  /* Hero CTA buttons stack */
-  section > .container > div[style*="display: flex"][style*="gap: 1rem"] {
-    flex-direction: column;
-    align-items: center;
+  /* Footer adjustments */
+  footer div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+    gap: 3rem !important;
   }
 }
 
 /* Phone breakpoint */
 @media (max-width: 480px) {
   .container {
-    padding: 0 1rem;
+    padding: 0 1.25rem;
   }
 
   section {
@@ -170,15 +173,15 @@ h1, h2, h3 {
   }
 
   h1 {
-    font-size: 2rem !important;
+    font-size: 2.5rem !important;
   }
 
   h2 {
-    font-size: 1.6rem !important;
+    font-size: 1.8rem !important;
   }
 
   h3 {
-    font-size: 1.1rem !important;
+    font-size: 1.2rem !important;
   }
 
   /* Pricing cards single column */
@@ -187,7 +190,13 @@ h1, h2, h3 {
   }
 
   button.premium {
-    padding: 14px 20px;
-    font-size: 0.95rem;
+    width: 100%;
+    padding: 16px;
+    font-size: 1rem;
+  }
+
+  /* Nav adjustments */
+  nav img {
+    height: 48px !important;
   }
 }

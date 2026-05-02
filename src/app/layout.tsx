@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Transcribe any TikTok, YouTube, or Instagram video into text quickly and accurately using AI.",
 };
 
+import CookieConsent from "@/components/CookieConsent";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -13,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieConsent />
+      </body>
     </html>
   );
 }

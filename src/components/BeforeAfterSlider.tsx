@@ -30,7 +30,8 @@ const BeforeAfterSlider = () => {
         height: '500px',
         overflow: 'hidden',
         borderRadius: '24px',
-        cursor: 'col-resize'
+        cursor: 'col-resize',
+        touchAction: 'none'
       }}
     >
       {/* "After" Image (The new way) */}
@@ -44,26 +45,28 @@ const BeforeAfterSlider = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '3rem'
+        padding: '1.5rem'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1rem', color: '#666', marginBottom: '1rem', fontWeight: '700' }}>AFTER REV</div>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem', fontWeight: '700', letterSpacing: '0.1em' }}>AFTER REV</div>
           <div style={{ 
             background: 'rgba(255,255,255,0.02)', 
-            padding: '3rem', 
+            padding: '2.5rem 1.5rem', 
             borderRadius: '20px', 
             border: '1px solid var(--border)',
-            boxShadow: '0 0 50px rgba(255,255,255,0.05)'
+            boxShadow: '0 0 50px rgba(255,255,255,0.05)',
+            maxWidth: '300px',
+            margin: '0 auto'
           }}>
-            <h3 style={{ fontSize: '3rem', marginBottom: '1rem', color: '#fff' }}>15 Min</h3>
-            <p style={{ color: '#888' }}>Total Research Time</p>
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <div style={{ background: '#222', padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem' }}>AI Hook Gen</div>
-              <div style={{ background: '#222', padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem' }}>Bulk Export</div>
+            <h3 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: '#fff', fontWeight: '800' }}>15 Min</h3>
+            <p style={{ color: '#888', fontSize: '0.9rem' }}>Total Research Time</p>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <div style={{ background: '#222', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', color: '#fff' }}>AI Hook Gen</div>
+              <div style={{ background: '#222', padding: '6px 12px', borderRadius: '6px', fontSize: '0.7rem', color: '#fff' }}>Bulk Export</div>
             </div>
           </div>
-          <p style={{ marginTop: '2rem', color: '#ccc', maxWidth: '400px' }}>
-            Pull your top 5 scripts, generate 20 hooks, and have a full script written in one conversation.
+          <p style={{ marginTop: '1.5rem', color: '#ccc', maxWidth: '280px', fontSize: '0.9rem', margin: '1.5rem auto 0' }}>
+            Pull your top 5 scripts, generate 20 hooks, and have a full script written in once.
           </p>
         </div>
       </div>
@@ -82,20 +85,22 @@ const BeforeAfterSlider = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '3rem'
+        padding: '1.5rem'
       }}>
-        <div style={{ textAlign: 'center', width: '100%', minWidth: '800px' }}>
-          <div style={{ fontSize: '1rem', color: '#666', marginBottom: '1rem', fontWeight: '700' }}>BEFORE REV</div>
+        <div style={{ textAlign: 'center', width: '100%', minWidth: '320px' }}>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem', fontWeight: '700', letterSpacing: '0.1em' }}>BEFORE REV</div>
           <div style={{ 
             opacity: 0.5,
-            padding: '3rem', 
+            padding: '2.5rem 1.5rem', 
             borderRadius: '20px', 
             border: '1px solid rgba(255,255,255,0.1)',
+            maxWidth: '300px',
+            margin: '0 auto'
           }}>
-            <h3 style={{ fontSize: '3rem', marginBottom: '1rem' }}>12+ Hrs</h3>
-            <p style={{ color: '#888' }}>Manual Research Time</p>
+            <h3 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: '800' }}>12+ Hrs</h3>
+            <p style={{ color: '#888', fontSize: '0.9rem' }}>Manual Research Time</p>
           </div>
-          <p style={{ marginTop: '2rem', color: '#666', maxWidth: '400px', margin: '2rem auto 0' }}>
+          <p style={{ marginTop: '1.5rem', color: '#666', maxWidth: '280px', fontSize: '0.9rem', margin: '1.5rem auto 0' }}>
             Try to remember what made your last video work, guess at a hook, write something, delete it, start over.
           </p>
         </div>

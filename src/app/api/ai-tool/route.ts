@@ -24,47 +24,36 @@ export async function POST(req: Request) {
     const { action, transcript, userId } = await req.json();
     const startTime = Date.now();
 
-    if (!transcript || !action || !userId) {
+    if (!action || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Fetch user's current plan and metadata
+    // 1. Fetch user's current balance and tier
     const { data: planData } = await supabaseAdmin
       .from('plan_tracking')
-      .select('plan_tier')
+      .select('plan_tier, credits_remaining')
       .eq('user_id', userId)
       .single();
 
     const planTier = (planData?.plan_tier || 'free').toLowerCase();
-    
-    // Grab metadata via auth admin
-    const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.getUserById(userId);
-    if (authErr || !authData.user) {
-      return NextResponse.json({ error: 'Invalid user or unauthorized.' }, { status: 401 });
-    }
+    const isPro = planTier === 'pro';
+    const creditsRemaining = planData?.credits_remaining ?? 0;
 
-    const currentUsed = authData.user.user_metadata?.ai_credits_used || 0;
-    const maxAllowed = creditLimits[planTier] || 5;
+    console.log(`[AI-Tool] Action: ${action}, Tier: ${planTier}, Remaining: ${creditsRemaining}`);
 
-    console.log(`[AI-Tool] Action: ${action}, Tier: ${planTier}, Credits: ${currentUsed}/${maxAllowed}`);
-
-    if (currentUsed >= maxAllowed) {
-      return NextResponse.json({ error: `You have reached your AI Credit limit (${maxAllowed}). Please upgrade your plan to continue generating AI insights.` }, { status: 403 });
+    // check if user has credits
+    if (!isPro && creditsRemaining <= 0) {
+      return NextResponse.json({ 
+        error: `You have reached your AI Credit limit. Please upgrade your plan to continue generating AI insights.` 
+      }, { status: 403 });
     }
 
     let aiResultText = '';
-
+    // ... (Langdock logic remains the same)
     if (USE_MOCK) {
       await new Promise(r => setTimeout(r, 1500));
-      if (action === 'hooks') {
-        aiResultText = "1. Stop skipping, this changes everything.\n2. The 3-second psychological trick nobody tells you.\n3. If you want results, do THIS exact thing.";
-      } else if (action === 'explainer') {
-        aiResultText = "The rapid visual transitions in the first 5 seconds immediately capture attention. The speaker uses high-contrast emotional statements to create a curiosity gap, heavily driving up average view duration.";
-      } else {
-        aiResultText = "Data generated.";
-      }
+      aiResultText = "Mock data active. Disable USE_MOCK in .env.local to see real AI results.";
     } else {
-      // Prompt construction depending on action
       let systemInstruction = '';
       if (action === 'hooks') {
         systemInstruction = "Analyze this transcript and write exactly 3 high-converting viral hooks optimized for short-form video (TikTok/Reels). Output them as a concise numbered list. Do NOT chat, just output the hooks.";
@@ -74,7 +63,6 @@ export async function POST(req: Request) {
         systemInstruction = "Summarize the following transcript.";
       }
 
-      // Hit Langdock
       const response = await fetch('https://api.langdock.com/agent/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -84,34 +72,29 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           agentId: LANGDOCK_AGENT_ID,
           stream: false,
-          messages: [
-            {
-              id: 'msg-' + Date.now(),
-              role: 'user',
-              parts: [{
-                type: 'text',
-                text: `${systemInstruction}\n\nTRANSCRIPT:\n${transcript}`
-              }]
-            }
-          ]
+          messages: [{ id: 'msg-' + Date.now(), role: 'user', parts: [{ type: 'text', text: `${systemInstruction}\n\nTRANSCRIPT:\n${transcript}` }] }]
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Langdock error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Langdock error: ${response.status}`);
       const rawData = await response.json();
       const assistantMessage = rawData.messages?.find((m: any) => m.role === 'assistant');
       aiResultText = assistantMessage?.content || assistantMessage?.parts?.[0]?.text || '';
     }
 
-    // 3. Consume the credit by incrementing metadata
-    await supabaseAdmin.auth.admin.updateUserById(userId, {
-      user_metadata: { ai_credits_used: currentUsed + 1 }
-    });
+    // 3. Consume the credit atomically
+    if (!isPro) {
+      const { error: decrError } = await supabaseAdmin.rpc('decrement_credits', { user_id_arg: userId });
+      if (decrError) {
+        console.warn('[AI-Tool] RPC failed, falling back to manual update:', decrError.message);
+        await supabaseAdmin
+          .from('plan_tracking')
+          .update({ credits_remaining: Math.max(0, creditsRemaining - 1) })
+          .eq('user_id', userId);
+      }
+    }
 
-    // 4. Log to time-series usage_logs for deep analytics
+    // 4. Log to time-series usage_logs
     const processingTime = Date.now() - startTime;
     await supabaseAdmin
       .from('usage_logs')
@@ -122,8 +105,6 @@ export async function POST(req: Request) {
         processing_time_ms: processingTime,
         status: 'success'
       });
-
-    console.log(`[AI-Tool] Consumed 1 credit. New total: ${currentUsed + 1}`);
 
     return NextResponse.json({ success: true, result: aiResultText });
 

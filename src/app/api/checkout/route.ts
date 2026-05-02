@@ -34,7 +34,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Price ID not configured in environment' }, { status: 500 });
     }
 
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    // Determine origin robustly (works behind nginx/proxy)
+    const forwardedProto = request.headers.get('x-forwarded-proto');
+    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const origin =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      request.headers.get('origin') ||
+      (forwardedHost ? `${forwardedProto || 'https'}://${forwardedHost}` : 'https://rev-pro.dev');
 
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({

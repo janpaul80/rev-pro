@@ -3,6 +3,14 @@ node_modules
 *.tsbuildinfo
 next-env.d.ts
 .git
+.github
 scratch
 test-langdock.ts
 tsconfig.tsbuildinfo
+vps_id_rsa
+vps_id_rsa_backup
+project.zip
+assets
+supabase
+scripts
+.env.local

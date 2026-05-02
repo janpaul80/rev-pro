@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   // Setup Supabase Admin
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVIC_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   // 1. Handle Checkout completion (Initial Purchase)

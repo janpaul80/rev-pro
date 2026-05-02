@@ -34,27 +34,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '3rem', alignItems: 'center' }}>
-            {/* Visual Proof: Glassmorphic Chart Mockup */}
-            <div className="glass" style={{ padding: '2rem', borderRadius: '32px', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(to right, transparent, #fbb02e, transparent)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <span style={{ fontSize: '0.8rem', color: '#fbb02e', fontWeight: '800', textTransform: 'uppercase' }}>Live Analytics Mockup</span>
-                <BarChart3 size={20} color="#fbb02e" />
-              </div>
-              
-              {/* Decorative Chart Placeholder */}
-              <div style={{ height: '300px', display: 'flex', alignItems: 'flex-end', gap: '10px', padding: '20px 0' }}>
-                {[60, 40, 80, 50, 90, 70, 85].map((h, i) => (
-                  <div key={i} style={{ flex: 1, height: `${h}%`, background: 'rgba(251,176,46,0.1)', border: '1px solid rgba(251,176,46,0.3)', borderRadius: '8px', position: 'relative' }}>
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%', background: '#fbb02e', borderRadius: '4px', opacity: 0.8 }} />
-                  </div>
-                ))}
-              </div>
-              <div style={{ paddingTop: '1rem', borderTop: '1px solid #111', color: '#444', fontSize: '0.8rem', textAlign: 'center' }}>
-                Viral Potential Threshold identified at 84.2% confidence
-              </div>
-            </div>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
 
             {/* Feature Callouts */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>

@@ -17,7 +17,7 @@ const env = parseEnv('.env.local');
 
 const supabase = createClient(
   env.SUPABASE_URL,
-  env.SUPABASE_SERVIC_ROLE_KEY
+  env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 async function fixStuck() {

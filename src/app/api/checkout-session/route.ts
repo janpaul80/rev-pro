@@ -16,23 +16,33 @@ export async function POST(req: Request) {
   });
 
   try {
-    const { priceId } = await req.json();
+    const { priceId, userId } = await req.json();
 
     if (!priceId) {
       return NextResponse.json({ error: 'Price ID is required' }, { status: 400 });
     }
 
+    // Determine origin robustly (works behind nginx/proxy)
+    const forwardedProto = req.headers.get('x-forwarded-proto');
+    const forwardedHost = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const origin =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      req.headers.get('origin') ||
+      (forwardedHost ? `${forwardedProto || 'https'}://${forwardedHost}` : 'https://rev-pro.dev');
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
+      client_reference_id: userId,
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${req.headers.get('origin')}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get('origin')}/pricing`,
+      success_url: `${origin}/dashboard?success=true`,
+      cancel_url: `${origin}/pricing`,
+      metadata: { userId }
     });
 
     return NextResponse.json({ sessionId: session.id, url: session.url });

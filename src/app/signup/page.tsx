@@ -26,7 +26,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
       },
     });
 
@@ -43,10 +43,13 @@ export default function SignupPage() {
     setOauthLoading(provider);
     setError(null);
 
+    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`;
+    console.log('[Auth] Redirecting to signup callback:', redirectTo);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo,
       },
     });
 
@@ -196,6 +199,11 @@ export default function SignupPage() {
             />
           </div>
 
+          {process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_SITE_URL && (
+            <div style={{ color: '#ffcc00', fontSize: '0.75rem', marginBottom: '1rem', background: 'rgba(255,204,0,0.1)', padding: '8px', borderRadius: '4px' }}>
+              ⚠️ Development fallback active. Ensure NEXT_PUBLIC_SITE_URL is set.
+            </div>
+          )}
           {error && <div style={{ color: '#ff4444', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
 
           <button

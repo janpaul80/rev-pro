@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // Using service role to bypass RLS if needed, although user can insert their own
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVIC_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     const { data, error } = await supabaseAdmin

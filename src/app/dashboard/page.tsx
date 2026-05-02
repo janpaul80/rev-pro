@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import ViralHeatmap from '@/components/ViralHeatmap';
 import BatchMonitor, { BatchItem } from '@/components/BatchMonitor';
+import TierBadge from '@/components/TierBadge';
 import { exportToCSV } from '@/utils/csvExport';
 
 function DashboardContent() {
@@ -34,6 +35,8 @@ function DashboardContent() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [planTier, setPlanTier] = useState<string>('Free');
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
+  const [creditsTotal, setCreditsTotal] = useState<number | null>(null);
   const [folders, setFolders] = useState<any[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -114,15 +117,17 @@ function DashboardContent() {
         setFolders(folderData);
       }
 
-      // Fetch the plan
+      // Fetch the plan and credits
       const { data: planData } = await supabase
         .from('plan_tracking')
-        .select('plan_tier')
+        .select('plan_tier, credits_remaining, credits_total')
         .eq('user_id', session.user.id)
         .single();
         
-      if (planData && planData.plan_tier) {
-         setPlanTier(planData.plan_tier.charAt(0).toUpperCase() + planData.plan_tier.slice(1));
+      if (planData) {
+         if (planData.plan_tier) setPlanTier(planData.plan_tier.charAt(0).toUpperCase() + planData.plan_tier.slice(1));
+         if (planData.credits_remaining !== undefined) setCreditsRemaining(planData.credits_remaining);
+         if (planData.credits_total !== undefined) setCreditsTotal(planData.credits_total);
       }
     }
     setLoading(false);
@@ -365,8 +370,8 @@ function DashboardContent() {
   };
 
   const stats = [
+    { label: 'Available Credits', value: creditsRemaining !== null ? (planTier === 'Pro' ? '∞' : creditsRemaining) : '...', icon: <CreditCard size={20} color="#fbb02e" /> },
     { label: 'Total Transcripts', value: transcriptions.length, icon: <FileText size={20} color="#fbb02e" /> },
-    { label: 'AI Tool Usage', value: usageLogs.filter(l => l.action_type !== 'transcription').length, icon: <Zap size={20} color="#fbb02e" /> },
     { label: 'Credits Consumed', value: usageLogs.reduce((acc, curr) => acc + curr.credits_used, 0), icon: <Activity size={20} color="#fbb02e" /> },
     { label: 'Success Rate', value: `${transcriptions.length > 0 ? ((transcriptions.filter(t => t.status === 'completed').length / transcriptions.length) * 100).toFixed(1) : 100}%`, icon: <CheckCircle size={20} color="#fbb02e" /> },
   ];
@@ -407,6 +412,8 @@ function DashboardContent() {
           <Link href="/docs" style={{ color: '#888', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fbb02e'} onMouseOut={(e) => e.currentTarget.style.color = '#888'}>
             Documentation
           </Link>
+          
+          <TierBadge planTier={planTier} creditsRemaining={creditsRemaining} />
           
           <div style={{ position: 'relative' }} ref={menuRef}>
             <button 
